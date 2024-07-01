@@ -31,7 +31,7 @@ const fetchFilesRecursively = async (folderId, drive) => {
 };
 
 const generateDownloadUrl = (fileId) => {
-    return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${process.env.GOOGLE_API_KEY}`;
+    return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${process.env.API_KEY}`;
 };
 
 const saveDriveContent = async (req, res) => {
@@ -76,43 +76,26 @@ const downloadFile = async (req, res) => {
     const { fileId } = req.params;
 
     try {
+       
         const driveSermon = await DriveSermon.findOne({ 'files.fileId': fileId });
         if (!driveSermon) {
             return res.status(404).json({ message: 'File not found' });
         }
 
         const file = driveSermon.files.find(file => file.fileId === fileId);
-        const filePath = path.join(__dirname, '..', 'downloads', file.name);
 
-        const writer = fs.createWriteStream(filePath);
+      
+        const downloadUrl = file.downloadUrl || generateDownloadUrl(fileId);
 
-        const response = await axios({
-            url: file.downloadUrl,
-            method: 'GET',
-            responseType: 'stream'
-        });
-
-        response.data.pipe(writer);
-
-        writer.on('finish', () => {
-            res.download(filePath, file.name, err => {
-                if (err) {
-                    console.error('Download error:', err);
-                    res.status(500).send('Error downloading file');
-                }
-
-                fs.unlinkSync(filePath);
-            });
-        });
-
-        writer.on('error', () => {
-            console.error('File write error');
-            res.status(500).send('Error writing file');
-        });
+        
+        res.status(200).json({ downloadUrl });
     } catch (error) {
+        console.error('Error generating download link:', error);
         res.status(500).json({ message: error.message });
     }
 };
+
+
 
 module.exports = {
     saveDriveContent,
